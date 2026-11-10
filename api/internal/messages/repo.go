@@ -103,13 +103,19 @@ func (r *repo) GetByID(ctx context.Context, id int64) (*Message, error) {
 
 func (r *repo) Create(ctx context.Context, content string, rawMetadata json.RawMessage, channel channels.Channel, user users.User, anonymous bool, createdAt *time.Time) (*Message, error) {
 	var message Message
+	// pgx ne sait pas encoder json.RawMessage vers une colonne TEXT, et la
+	// colonne refuse NULL : on passe toujours une chaîne JSON valide.
+	if len(rawMetadata) == 0 {
+		rawMetadata = json.RawMessage(`{}`)
+	}
+	metadata := string(rawMetadata)
 	if createdAt == nil {
 		query := `INSERT INTO messages
 			(content, metadata, user_id, channel_id, anonymous, posted_at, creation_date) VALUES (?, ?, ?, ?, ?, NOW(), NOW())
 			RETURNING id, content, user_id, anonymous, posted_at, creation_date`
 
 		query = r.db.Rebind(query)
-		err := r.db.GetContext(ctx, &message, query, content, rawMetadata, user.ID, channel.ID, anonymous)
+		err := r.db.GetContext(ctx, &message, query, content, metadata, user.ID, channel.ID, anonymous)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating channel: %w", err)
 		}
@@ -119,7 +125,7 @@ func (r *repo) Create(ctx context.Context, content string, rawMetadata json.RawM
 			RETURNING id, content, user_id, anonymous, posted_at, creation_date`
 
 		query = r.db.Rebind(query)
-		err := r.db.GetContext(ctx, &message, query, content, rawMetadata, user.ID, channel.ID, anonymous, createdAt)
+		err := r.db.GetContext(ctx, &message, query, content, metadata, user.ID, channel.ID, anonymous, createdAt)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating channel: %w", err)
 		}
