@@ -102,13 +102,17 @@ func (r *repo) GetByID(ctx context.Context, id int64) (*Channel, error) {
 }
 
 func (r *repo) Create(ctx context.Context, name string, metadata json.RawMessage) (*Channel, error) {
+	if metadata == nil {
+		metadata = json.RawMessage(`{}`)
+	}
+
 	query := `INSERT INTO channels
 		(name, metadata, creation_date) VALUES (?, ?, NOW())
 		RETURNING id, name, metadata, creation_date`
 
 	query = r.db.Rebind(query)
 	var channel Channel
-	err := r.db.GetContext(ctx, &channel, query, name, metadata)
+	err := r.db.GetContext(ctx, &channel, query, name, string(metadata))
 	if err != nil {
 		return nil, fmt.Errorf("Error creating channel: %w", err)
 	}
